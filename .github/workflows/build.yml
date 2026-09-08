@@ -47,6 +47,9 @@ jobs:
         shell: pwsh
         run: ./scripts/build-discord-rpc-helper.ps1
 
+      - name: Test MBF manifest injector
+        run: python3 -m unittest discover -s tests -p "test_*.py" -v
+
       - name: Setup QPM
         uses: Fernthedev/qpm-action@v1
         with:
@@ -59,6 +62,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           qpm qmod zip
+          python3 scripts/inject_mbf_manifest_requirements.py DiscordRichPresence.qmod
 
       - name: Get Output Names
         id: names

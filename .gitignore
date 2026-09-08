@@ -19,6 +19,8 @@ build/
 *.qmod
 
 # Script outputs and artifacts
+__pycache__/
+*.pyc
 *.log
 *.html
 

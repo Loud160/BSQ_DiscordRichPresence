@@ -171,12 +171,27 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     addPrivacyToggle(getConfig().QuestShowPlatform);
     addPrivacyToggle(getConfig().QuestShowMultiplayer);
 
-    auto* reconnectButton = BSML::Lite::CreateUIButton(container->get_transform(), "Reconnect Quest Discord", []() {
+    auto questStatus = BSML::Lite::CreateText(
+        container->get_transform(),
+        "Quest Discord status: " + QuestDiscord::GetConnectionStatus(),
+        3.0f);
+    if (questStatus) {
+        questStatus->set_enableWordWrapping(true);
+        questStatus->set_alignment(TMPro::TextAlignmentOptions::Center);
+        questControls->push_back(questStatus->get_gameObject());
+    }
+    auto safeQuestStatus = UnityW(questStatus);
+
+    auto* reconnectButton = BSML::Lite::CreateUIButton(container->get_transform(), "Reconnect Quest Discord", [safeQuestStatus]() mutable {
         // Reconnect is user-triggered and must never propagate JNI allocation
         // or class-loader failures through the BSML button event.
         try {
             QuestDiscord::Initialize();
             QuestDiscord::Refresh();
+            if (safeQuestStatus) {
+                safeQuestStatus->set_text(
+                    "Quest Discord status: " + QuestDiscord::GetConnectionStatus());
+            }
         } catch (const std::exception& error) {
             logger.error("CreateQuestContent reconnect callback failed safely: {}", error.what());
         } catch (...) {

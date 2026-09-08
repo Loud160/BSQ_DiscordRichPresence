@@ -14,7 +14,7 @@ The in-game `Discord Rich Presence` settings menu can route the same Beat Saber 
 Disabled Quest fields are omitted from the Discord activity rather than replaced with misleading zero or blank values.
 
 > [!IMPORTANT]
-> Quest Discord mode is currently a proof of concept. Beat Saber's manifest must contain a package-visibility query for `com.discord`. The helper and all runtime code are included in the QMOD, but current MBF releases do not apply this manifest entry during ordinary QMOD installation. Desktop Companion mode does not need that patch.
+> Quest Discord mode requires Beat Saber's manifest to contain a package-visibility query for `com.discord`. The QMOD declares this through the optional `mbfManifestRequirements` extension, which supported MBF builds apply automatically without another prompt. Older MBF releases and other installers may ignore the extension; if the Discord service is unavailable, the mod reports an actionable status in its settings. Desktop Companion mode does not need this manifest entry.
 
 ## 📋 Desktop Companion Requirements
 
@@ -159,7 +159,12 @@ pwsh ./scripts/build-discord-rpc-helper.ps1
 qpm ndk resolve
 qpm restore
 qpm qmod zip
+python scripts/inject_mbf_manifest_requirements.py DiscordRichPresence.qmod
 ```
+
+The final step is required because QPM.CLI currently drops unknown root fields while generating
+`mod.json`. The script validates the MBF extension, rewrites the archive atomically, and verifies
+that every non-manifest payload remains byte-for-byte unchanged.
 
 ## Credits
 
