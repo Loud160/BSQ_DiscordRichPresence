@@ -4,6 +4,7 @@
 #include "bsml/shared/BSML.hpp"
 #include "UnityEngine/Application.hpp"
 #include "UnityEngine/GameObject.hpp"
+#include "UnityEngine/RectTransform.hpp"
 #include "UnityEngine/UI/LayoutElement.hpp"
 #include "GlobalNamespace/MainMenuViewController.hpp"
 #include "GlobalNamespace/MultiplayerLobbyConnectionController.hpp"
@@ -23,6 +24,70 @@
 using namespace GlobalNamespace;
 
 namespace {
+    // The Mods settings screen is approximately 116 units wide. Leave a small
+    // margin for its mask and scrollbar while allowing labels to use nearly
+    // the full panel instead of the stock prefab's narrower 90-unit geometry.
+    constexpr float SettingsPanelRowWidth = 112.0f;
+    constexpr float SettingsPanelToggleHeight = 8.0f;
+
+    BSML::ToggleSetting* FitToggleToSettingsPanel(BSML::ToggleSetting* toggle) {
+        if (!toggle || !toggle->get_gameObject()) return toggle;
+
+        auto* object = toggle->get_gameObject().ptr();
+        auto* layout = object->GetComponent<UnityEngine::UI::LayoutElement*>();
+        if (!layout) layout = object->AddComponent<UnityEngine::UI::LayoutElement*>();
+        if (layout) {
+            // BSML copies Beat Saber's 90-unit fullscreen settings prefab.
+            // The Mods settings panel is narrower, so retaining that width
+            // pushes most of the caption behind the panel mask. Give every
+            // toggle one panel-sized row with a stable height instead.
+            layout->set_minWidth(SettingsPanelRowWidth);
+            layout->set_preferredWidth(SettingsPanelRowWidth);
+            layout->set_flexibleWidth(0.0f);
+            layout->set_minHeight(SettingsPanelToggleHeight);
+            layout->set_preferredHeight(SettingsPanelToggleHeight);
+        }
+
+        auto root = object->get_transform().cast<UnityEngine::RectTransform>();
+        auto switchTransform = root->Find("SwitchView");
+        auto* switchRect = switchTransform
+            ? switchTransform->get_gameObject()->GetComponent<UnityEngine::RectTransform*>()
+            : nullptr;
+        constexpr float switchWidth = 10.0f;
+
+        if (auto nameTransform = root->Find("NameText")) {
+            auto nameRect = nameTransform.cast<UnityEngine::RectTransform>();
+            // The caption owns the row up to the switch. This is deliberately
+            // anchor-based so all privacy labels remain separate from their
+            // switches as the scroll view lays out or rebuilds its contents.
+            nameRect->set_anchorMin({0.0f, 0.0f});
+            nameRect->set_anchorMax({1.0f, 1.0f});
+            nameRect->set_pivot({0.5f, 0.5f});
+            nameRect->set_offsetMin({0.5f, 0.0f});
+            nameRect->set_offsetMax({-(switchWidth + 1.5f), 0.0f});
+            if (toggle->text) {
+                toggle->text->set_alignment(TMPro::TextAlignmentOptions::MidlineLeft);
+                toggle->text->set_enableWordWrapping(false);
+                toggle->text->set_overflowMode(TMPro::TextOverflowModes::Ellipsis);
+                toggle->text->set_fontSize(3.0f);
+            }
+        }
+
+        if (switchRect) {
+            // Pin the native switch to the right edge of its own row. Do not
+            // replace it: keeping BSML's switch preserves focus, sound, hover,
+            // and controller interaction behavior.
+            switchRect->set_anchorMin({1.0f, 0.5f});
+            switchRect->set_anchorMax({1.0f, 0.5f});
+            switchRect->set_pivot({1.0f, 0.5f});
+            switchRect->set_anchoredPosition({-0.5f, 0.0f});
+            const auto currentSize = switchRect->get_sizeDelta();
+            switchRect->set_sizeDelta({switchWidth, currentSize.y});
+        }
+
+        return toggle;
+    }
+
     // Use complete display labels as the dropdown choices so BSML owns both
     // the visible setting label and selector layout. This avoids the manually
     // positioned label/control pairs that previously stacked in this menu.
@@ -62,7 +127,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     auto questControls = std::make_shared<std::vector<UnityW<UnityEngine::GameObject>>>();
     const bool useQuest = getConfig().UseQuestDiscord.GetValue();
 
-    BSML::Lite::CreateToggle(container->get_transform(), "Send Presence to Quest Discord App", useQuest,
+    FitToggleToSettingsPanel(BSML::Lite::CreateToggle(container->get_transform(), "Send Presence to Quest Discord App", useQuest,
         [desktopControls, questControls](bool enabled) {
             for (auto& control : *desktopControls) {
                 if (control) control->SetActive(!enabled);
@@ -71,7 +136,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
                 if (control) control->SetActive(enabled);
             }
             SetQuestDiscordMode(enabled);
-        });
+        }));
 
     auto desktopTitle = BSML::Lite::CreateText(container->get_transform(), "Desktop Companion");
     if (desktopTitle) {
@@ -137,7 +202,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     // is safe; each toggle immediately rebuilds the native Quest activity.
     auto addPrivacyToggle = [container, questControls](auto& setting) {
         auto* settingPtr = &setting;
-        auto* toggle = BSML::Lite::CreateToggle(
+        auto* toggle = FitToggleToSettingsPanel(BSML::Lite::CreateToggle(
             container->get_transform(),
             setting.GetName(),
             setting.GetValue(),
@@ -152,7 +217,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
                 } catch (...) {
                     logger.error("CreatePrivacyToggle callback failed with a non-standard exception");
                 }
-            });
+            }));
         if (toggle) questControls->push_back(toggle->get_gameObject());
     };
 

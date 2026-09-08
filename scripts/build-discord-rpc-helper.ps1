@@ -5,7 +5,10 @@ $sourceRoot = Join-Path (Join-Path $repoRoot 'android-helper') 'src'
 $outputRoot = Join-Path (Join-Path $repoRoot 'build') 'android-helper'
 $classesRoot = Join-Path $outputRoot 'classes'
 $dexRoot = Join-Path $outputRoot 'dex'
-$jarPath = Join-Path $repoRoot 'build\discord-rpc-helper.jar'
+# Build each path segment with Join-Path. A backslash inside the child string is
+# a directory separator on Windows but a literal filename character on Linux,
+# which would put the CI helper beside the build directory instead of in it.
+$jarPath = Join-Path (Join-Path $repoRoot 'build') 'discord-rpc-helper.jar'
 $isWindowsHost = $env:OS -eq 'Windows_NT'
 
 function Find-RequiredTool {
@@ -26,10 +29,13 @@ function Find-RequiredTool {
 # compatibility fallbacks for the workstation on which this mod was developed;
 # they are no longer requirements for another contributor or GitHub Actions.
 $javaExecutableSuffix = if ($isWindowsHost) { '.exe' } else { '' }
-$javaHomeCandidates = @(
-    $env:JAVA_HOME,
-    'C:\Program Files\Android\openjdk\jdk-21.0.8'
-) | Where-Object { $_ }
+$javaHomeCandidates = @($env:JAVA_HOME) | Where-Object { $_ }
+if ($isWindowsHost) {
+    # Never pass a Windows drive path to Join-Path under Linux PowerShell.
+    # GitHub Actions supplies JAVA_HOME, while this fallback remains useful on
+    # the original Windows development machine when JAVA_HOME is not defined.
+    $javaHomeCandidates += 'C:\Program Files\Android\openjdk\jdk-21.0.8'
+}
 $javacCandidates = @($javaHomeCandidates | ForEach-Object {
     Join-Path (Join-Path $_ 'bin') "javac$javaExecutableSuffix"
 })
@@ -43,11 +49,15 @@ if ($jarOnPath) { $jarCandidates += $jarOnPath.Source }
 $javac = Find-RequiredTool -DisplayName 'javac' -Candidates $javacCandidates
 $jar = Find-RequiredTool -DisplayName 'jar' -Candidates $jarCandidates
 
-$androidSdkCandidates = @(@(
-    $env:ANDROID_HOME,
-    $env:ANDROID_SDK_ROOT,
-    'C:\Program Files (x86)\Android\android-sdk'
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) })
+$androidSdkRoots = @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT) | Where-Object { $_ }
+if ($isWindowsHost) {
+    # As with Java above, only evaluate the workstation fallback on Windows;
+    # Linux runners do not have a C: provider for PowerShell to resolve.
+    $androidSdkRoots += 'C:\Program Files (x86)\Android\android-sdk'
+}
+$androidSdkCandidates = @($androidSdkRoots | Where-Object {
+    Test-Path -LiteralPath $_ -PathType Container
+})
 if (-not $androidSdkCandidates) {
     throw 'Android SDK was not found. Set ANDROID_HOME or ANDROID_SDK_ROOT.'
 }
