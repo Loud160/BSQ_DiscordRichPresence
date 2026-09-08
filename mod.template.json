@@ -18,5 +18,10 @@
   "modFiles": [],
   "lateModFiles": [],
   "libraryFiles": [],
-  "fileCopies": []
+  "fileCopies": [
+    {
+      "name": "discord-rpc-helper.jar",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/DiscordRichPresence/discord-rpc-helper.jar"
+    }
+  ]
 }
