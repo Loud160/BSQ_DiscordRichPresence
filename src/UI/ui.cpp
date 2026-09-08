@@ -30,6 +30,27 @@ namespace {
     constexpr float SettingsPanelRowWidth = 112.0f;
     constexpr float SettingsPanelToggleHeight = 8.0f;
 
+    void ReserveTextRow(TMPro::TextMeshProUGUI* text, float height) {
+        if (!text || !text->get_gameObject()) return;
+
+        auto* object = text->get_gameObject().ptr();
+        auto* layout = object->GetComponent<UnityEngine::UI::LayoutElement*>();
+        if (!layout) layout = object->AddComponent<UnityEngine::UI::LayoutElement*>();
+        if (!layout) {
+            logger.error("Discord settings UI could not reserve a row for a text block");
+            return;
+        }
+
+        // BSML Lite text objects do not always include a LayoutElement. In a
+        // scrollable VerticalLayoutGroup, a text object without one can report
+        // zero preferred height, causing the following text/control to occupy
+        // the same row. Reserve real vertical space instead of manually moving
+        // either object, so rebuilding the layout remains deterministic.
+        layout->set_minHeight(height);
+        layout->set_preferredHeight(height);
+        layout->set_flexibleHeight(0.0f);
+    }
+
     BSML::ToggleSetting* FitToggleToSettingsPanel(BSML::ToggleSetting* toggle) {
         if (!toggle || !toggle->get_gameObject()) return toggle;
 
@@ -141,10 +162,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     auto desktopTitle = BSML::Lite::CreateText(container->get_transform(), "Desktop Companion");
     if (desktopTitle) {
         desktopTitle->set_alignment(TMPro::TextAlignmentOptions::Center);
-        auto* layout = desktopTitle->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>();
-        // LayoutElement is optional on custom BSML builds; omitting the height
-        // preference is safer than dereferencing a missing component.
-        if (layout) layout->set_preferredHeight(5.0f);
+        ReserveTextRow(desktopTitle, 6.0f);
         desktopControls->push_back(desktopTitle->get_gameObject());
     }
 
@@ -163,8 +181,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     auto questTitle = BSML::Lite::CreateText(container->get_transform(), "Quest Discord Privacy");
     if (questTitle) {
         questTitle->set_alignment(TMPro::TextAlignmentOptions::Center);
-        auto* layout = questTitle->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>();
-        if (layout) layout->set_preferredHeight(5.0f);
+        ReserveTextRow(questTitle, 6.0f);
         questControls->push_back(questTitle->get_gameObject());
     }
     auto questHelp = BSML::Lite::CreateText(
@@ -174,8 +191,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     if (questHelp) {
         questHelp->set_enableWordWrapping(true);
         questHelp->set_alignment(TMPro::TextAlignmentOptions::Center);
-        auto* layout = questHelp->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>();
-        if (layout) layout->set_preferredHeight(8.0f);
+        ReserveTextRow(questHelp, 9.0f);
         questControls->push_back(questHelp->get_gameObject());
     }
 
@@ -243,6 +259,7 @@ void DidActivate(HMUI::ViewController* self, bool firstActivation, bool addedToH
     if (questStatus) {
         questStatus->set_enableWordWrapping(true);
         questStatus->set_alignment(TMPro::TextAlignmentOptions::Center);
+        ReserveTextRow(questStatus, 8.0f);
         questControls->push_back(questStatus->get_gameObject());
     }
     auto safeQuestStatus = UnityW(questStatus);
